@@ -262,14 +262,14 @@
     },
     "subscriptionRecords": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "$comment": "Returned as one MCP text content block per record for compatibility and as {\"result\": [records...], \"completeness\": {...}} structured content, where `completeness.dropped` totals the per-record `dropped`. `subscribe_opcua_node` returns the one subscription it created; `list_subscriptions` returns every active one, and zero blocks when there are none. The `opcua://subscriptions` resource carries the same records under its \"subscriptions\" key.",
+      "$comment": "Returned as one MCP text content block per record for compatibility and as {\"result\": [records...], \"completeness\": {...}} structured content, where `completeness.dropped` totals the per-record `dropped`. `subscribe_opcua_nodes` returns one record per subscription it created; `list_subscriptions` returns every active one, and zero blocks when there are none. The `opcua://subscriptions` resource carries the same records under its \"subscriptions\" key.",
       "type": "array",
       "items": {
         "type": "object",
         "properties": {
           "subscription_id": {
             "type": "string",
-            "description": "Handle for this subscription, unique within the running MCP server. Pass it to `unsubscribe_opcua_node`. Example: 'sub-1'."
+            "description": "Handle for this subscription, unique within the running MCP server. Pass it to `unsubscribe_opcua_nodes`. Example: 'sub-1'."
           },
           "node_id": {
             "type": "string",
@@ -960,7 +960,7 @@
       "$comment": "MCP resources both servers expose. A resource is re-readable state rather than an action, which is what makes it the right home for live subscription data: an agent can refresh it without spending a tool call. Change *notifications* are deliberately not sent — see docs/architecture.md.",
       "uri": "opcua://subscriptions",
       "name": "opcua_subscriptions",
-      "description": "Active OPC UA data-change subscriptions and the values buffered for each. Re-read after `subscribe_opcua_node` to see what has changed.",
+      "description": "Active OPC UA data-change subscriptions and the values buffered for each. Re-read after `subscribe_opcua_nodes` to see what has changed.",
       "mimeType": "application/json",
       "body": {
         "$comment": "The document is a JSON object with one key, whose value is an array of records of the named result shape. The parity test reads the resource from both servers and checks it against this.",

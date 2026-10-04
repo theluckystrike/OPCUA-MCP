@@ -360,14 +360,14 @@
     },
     "SubscriptionRecords": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "$comment": "Returned as one MCP text content block per record for compatibility and as {\"result\": [records...], \"completeness\": {...}} structured content, where `completeness.dropped` totals the per-record `dropped`. `subscribe_opcua_node` returns the one subscription it created; `list_subscriptions` returns every active one, and zero blocks when there are none. The `opcua://subscriptions` resource carries the same records under its \"subscriptions\" key.",
+      "$comment": "Returned as one MCP text content block per record for compatibility and as {\"result\": [records...], \"completeness\": {...}} structured content, where `completeness.dropped` totals the per-record `dropped`. `subscribe_opcua_nodes` returns one record per subscription it created; `list_subscriptions` returns every active one, and zero blocks when there are none. The `opcua://subscriptions` resource carries the same records under its \"subscriptions\" key.",
       "type": "array",
       "items": {
         "type": "object",
         "properties": {
           "subscription_id": {
             "type": "string",
-            "description": "Handle for this subscription, unique within the running MCP server. Pass it to `unsubscribe_opcua_node`. Example: 'sub-1'."
+            "description": "Handle for this subscription, unique within the running MCP server. Pass it to `unsubscribe_opcua_nodes`. Example: 'sub-1'."
           },
           "node_id": {
             "type": "string",
