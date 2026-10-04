@@ -86,7 +86,7 @@ every partial-capable tool returns beside it:
 browse_opcua_nodes  depth=4  node_class="Variable"  include_values=true
 → { "nodes": [ { "node_id": "ns=2;i=3", "browse_name": "2:Temperature",
                  "node_class": "Variable", "data_type": "Double", "value": 26.34, … } ],
-    "truncated": false, "inspected": 22 }
+    "truncated": false, "inspected": 39 }
   completeness: { "complete": true, "reasons": [], … }
 ```
 

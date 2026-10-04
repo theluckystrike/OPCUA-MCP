@@ -2,9 +2,9 @@
 
 All routes run locally over MCP stdio, with one client context and one OPC UA
 endpoint per process. Configure separate MCP entries for separate endpoints.
-Remote MCP service operation requires the
-[identity and isolation RFC](rfc/0001-remote-identity-isolation.md) to be accepted
-and implemented.
+Remote MCP service operation requires the accepted
+[identity and isolation RFC](rfc/0001-remote-identity-isolation.md) to be
+implemented.
 
 Four ways in, roughly in order of how little you need already installed.
 
@@ -232,7 +232,8 @@ Refused outright (exit 1, nothing written):
 - **`--profile operator` or `full` for a remote endpoint without
   `--server-cert`**, unless `--allow-unverified-remote-control` is given. An
   encrypted channel to an unpinned server is encrypted to whoever answers at that
-  address. "Remote" is anything but `localhost`, `127.0.0.0/8` and `::1`; an
+  address. "Remote" is anything but `localhost` (and `*.localhost`), `127.0.0.0/8`
+and `::1`; an
   address the installer cannot parse counts as remote. The server's own lab
   override, `--allow-unverified-server-control`, does not stand in for this one:
   it is written into the config and opens control at runtime, while
@@ -246,7 +247,8 @@ secret as a flag (`--password`), or a setting kept off the installer
 
 Written, with a `WARNING [code]` on stderr: a remote endpoint with no channel
 security (`no-channel-security`) or with an unpinned server (`server-not-pinned`);
-a password on an unencrypted channel; a password stored in the file; the
+a control profile written for an unpinned remote endpoint under
+`--allow-unverified-remote-control` (`unverified-remote-control`); a password on an unencrypted channel; a password stored in the file; the
 `OPCUA_ALLOW_INSECURE_CONTROL`, `OPCUA_ALLOW_UNVERIFIED_SERVER_CONTROL` or
 `OPCUA_ALLOW_OUT_OF_RANGE_WRITES` overrides; the `full` profile; a control profile
 with no audit file, or one the server would offer no control tool (the warning
@@ -360,7 +362,8 @@ runtime's OPC UA library is unmaintained — this project patches it
 ## Verifying a download
 
 Everything on a [release page](https://github.com/IndustriAgents/OPCUA-MCP/releases)
-— bundle, executables, npm tarball, wheel, sdist, and the SBOMs — can be checked
+— bundle, executables, npm tarball, wheel, sdist, the SBOMs and
+`runtime-compatibility.json` — can be checked
 three ways, none of which needs any access to this repository beyond reading it:
 
 | File | Proves | Check with |

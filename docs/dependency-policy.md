@@ -152,8 +152,8 @@ A dependency change is security-sensitive if it touches any of:
 - **MCP protocol** — `mcp`, `@modelcontextprotocol/sdk`, and the transport layer
   under them (`anyio`).
 - **Schema validation** — what validates tool arguments before a handler runs:
-  pydantic and jsonschema under the Python SDK, the validator bundled with the
-  TypeScript SDK.
+  `jsonschema` (direct) and pydantic under the Python SDK; `ajv` (direct) and the
+  validator bundled with the TypeScript SDK.
 - **Packaging** — what builds the artifacts users download: hatchling,
   PyInstaller, esbuild, postject, `@anthropic-ai/mcpb`, TypeScript.
 

@@ -125,8 +125,8 @@ The tool surface is defined once in [`contract/tools.json`](contract/tools.json)
 
 1. **Contract** (`contract/tools.json`): add an entry under `tools` with its `name`, `description` (its first sentence is the tool's one-line summary in the generated tables), `inputSchema` (JSON Schema), `accessClass`, `annotations`, `retryPolicy`, and `capabilities` (`[]`, or the entries of `capabilities` it depends on — any one of them is enough). A `control` or `alarm-action` tool also needs a `guard`, or the policy denies it.
    If the tool returns structured data rather than free text, give it a `resultShape` naming an entry under `resultShapes` — reuse an existing shape where one fits. Both servers must then emit that shape byte-comparably; a client that has learned one server's output has to be able to read the other's, and `tests/e2e/test_contract_parity.py` checks the real output against the shape.
-2. **Node** (`packages/server-node/src/tools.ts`): add a `case "foo"` to the `callTool` switch and implement the handler method. You do **not** edit `listTools` — it is generated from the contract. Run `npm run build` (this also stages the contract and version into `build/`).
-3. **Python** (`packages/server-python/src/opcua_mcp_server/server.py`): add a function `foo` with typed args (`MCPServer` derives the input schema from them — keep it matching the contract) and `ctx: Context`, and add its name to `TOOL_NAMES`, which `create_server` registers with the contract's description. Gating on a capability the contract already declares needs no code of its own: `list_tools` hides a tool whose `capabilities` the connected server does not advertise. A new capability also needs a probe on both runtimes.
+2. **Node** (`packages/server-node/src/tools.ts`): add a `case "foo"` to the switch in `dispatch` (called from `callTool`) and implement the handler method. You do **not** edit `listTools` — it is generated from the contract. Run `npm run build` (this also stages the contract and version into `build/`).
+3. **Python** (`packages/server-python/src/opcua_mcp_server/server.py`): add a function `foo` with typed args (`MCPServer` derives the input schema from them — keep it matching the contract) and `ctx: Context`, then run `uv run python scripts/contract_codegen.py` from the repo root, which regenerates `TOOL_NAMES` (in `generated_contract.py`) that `create_server` registers with the contract's description. Gating on a capability the contract already declares needs no code of its own: the call is refused (`_ensure_capabilities` / `ensureCapabilities`) when the connected server does not advertise it, while `list_tools` filters on policy only. A new capability also needs a probe on both runtimes.
 4. **Test**: add an end-to-end test in `tests/e2e/test_mcp_e2e.py` (it runs against both servers). The contract-parity test will automatically check that both servers advertise the new tool with the contract's description and parameters; if the tool declares a `resultShape`, assert the returned records against it with `assert_matches_result_shape`.
 5. **Document it** in `docs/examples.md` (the central per-tool reference) under a heading naming it in code (`` ### `foo` ``), then run `npm run config:generate` in `packages/server-node` to add it to the generated tool tables and counts.
 
@@ -135,8 +135,8 @@ Adding a **resource** follows the same path through the `resources` key: a `uri`
 document carries and the key it sits under. Node serves it from `listResources` /
 `readResource` in `src/tools.ts`; Python registers it with `@mcp.resource` in
 `server.py`, and note that `MCPServer` refuses to inject a `Context` into a
-*static* resource — which is why the subscription manager is module-level state
-rather than something held in the lifespan context.
+*static* resource — which is why the resource is a closure over the server,
+reading `mcp.state.subscriptions`, rather than a static resource.
 
 ## Code style
 

@@ -116,11 +116,13 @@ compared top-level property names, `required`, and each property's declared
 type, so it passed. It now compares the whole schema, and both runtimes advertise
 the same document.
 
-Arguments are checked against that same schema before anything else happens, by
-`validation.py` / `validation.ts` — a short function each over the nine JSON
-Schema keywords the contract actually uses, driven by one shared table
+Arguments are checked against that same schema right after the request-wide
+size bounds, by `validation.py` / `validation.ts`: the standard draft 2020-12
+validators (`jsonschema`'s `Draft202012Validator`, Ajv) over the keywords in
+`contract/schema-profile.json`, with their errors translated into the contract's
+own refusals and pinned by one shared table
 (`tests/fixtures/argument-validation.json`) that both unit suites run. Three of
-the nine were added after the fact, and each closed a hole: `additionalProperties`
+the original nine keywords were added after the fact, and each closed a hole: `additionalProperties`
 (no schema forbade extras, so a misspelled *optional* argument was accepted and
 silently changed behaviour — models misspell optional arguments), `enum`
 (`node_class` and `data_type` are fixed sets, and an unknown node class used to
@@ -606,12 +608,12 @@ contract now separates three kinds of evidence, and only one of them is prose:
 | --- | --- | --- |
 | `statusCodeNames` | 14 OPC UA status codes, by name | Each runtime resolves the name against *its own library's* enum (`ua.StatusCodes`, `StatusCodes`), so a name that stops existing there fails a test rather than never matching again — and the numbers come from the spec, so the two runtimes provably agree |
 | `socketErrors` | 6 errno codes | Fixed by the operating system, not by a library |
-| `phrases` | 3 strings | The fragile part, kept small. One is this project's own wording; the other two are node-opcua prose for a socket that went away without an errno |
+| `phrases` | 4 strings | The fragile part, kept small. One is this project's own wording; the other three are node-opcua prose for a lost socket or an unanswered service transaction without an errno |
 
 Where an error carries a status code, it is matched on the **number**, which a
 release note cannot reword. Text matching is the fallback, and it is the path
 most failures actually take — each tool body re-raises as `ToolError("Failed to
-read node ns=2;i=3: …")`, so by the time an error reaches the dispatcher it is
+read nodes: …")`, so by the time an error reaches the dispatcher it is
 prose. The cause chain is walked for exactly that reason.
 
 The check that actually fails when reconnection stops working is none of the
@@ -636,9 +638,9 @@ The three policies, and who has which:
 
 | Policy | Tools | What happens |
 | --- | --- | --- |
-| `resend` | the six reads | Rebuild, then run the request again. |
+| `resend` | the seven reads | Rebuild, then run the request again. |
 | `reconnectOnly` | the four monitor tools | Rebuild, report the original failure. A subscription lives on the session, so it died with it: the failure is complete, not uncertain. |
-| `uncertainOutcome` | `write_opcua_nodes`, `call_opcua_method`, `acknowledge_alarm` | Rebuild, then fail with `errors.uncertainOutcome`, which says the request may or may not have reached the plant and names what it was aimed at. |
+| `uncertainOutcome` | `write_opcua_nodes`, `call_opcua_method`, `acknowledge_alarm`, `act_on_alarm` | Rebuild, then fail with `errors.uncertainOutcome`, which says the request may or may not have reached the plant and names what it was aimed at. |
 
 The connection is rebuilt whatever the policy, so the next call finds a live
 session either way. What changes is only what this server is willing to claim.
@@ -751,6 +753,10 @@ contract/config.json         single source of truth for the configuration surfac
                              and server.json's environment variables
 contract/runtime-differences.json
                              what the two runtimes do not share, declared (ADR 0001)
+contract/contract.schema.json · schemas.json · schema-profile.json
+                             JSON Schema metaschema, generated $defs catalogue,
+                             keyword profile (contract-generation.md)
+scripts/contract_codegen.py  generates the contract types; --check in CI
 packages/server-python/      mcp MCPServer + opcua (FreeOpcUa)
   src/opcua_mcp_server/      config · security · contract · datetimes
                              · capabilities · aggregates · records
@@ -759,6 +765,7 @@ packages/server-python/      mcp MCPServer + opcua (FreeOpcUa)
                              · limits · operation_limits · completeness
                              · history · transport_limits · version
                              · install · cli · server
+                             · generated_contract · client_identity · result_text
   packaging/                 PyInstaller spec for the single-file executable
 packages/server-node/        @modelcontextprotocol/sdk + node-opcua-client
   src/                       config · security · contract · dates · records
@@ -767,6 +774,8 @@ packages/server-node/        @modelcontextprotocol/sdk + node-opcua-client
                              · limits · operation-limits · completeness
                              · history · transport-limits · tools
                              · install · index · sea
+                             · generated/contract-types · client-identity
+                             · result-text
   mcpb/manifest.json         MCP bundle manifest (Claude Desktop extension)
   scripts/                   build steps: npm package · .mcpb · executable
 packages/mock-server/        simulated PLC/sensors (:4840, no aggregates)
@@ -774,6 +783,7 @@ packages/mock-server-aggregate/  aggregate-capable mock (:4841)
 packages/mock-server-alarms/     Alarms & Conditions mock (:4842)
 tests/                       unit/ (fast) · e2e/ (both servers, secured and not)
                              · smoke/ (artifacts) · fixtures/ (secured mock, PKI)
+                             · conformance/ (real-server harness)
 examples/                    standalone demo scripts
 ```
 
@@ -792,9 +802,10 @@ Write conversion uses the target node's server-reported `Variant` metadata, not
 the host language type of its current value. The shared codec performs strict
 boolean parsing, integer range checks, lossless Int64/UInt64 conversion,
 base64 ByteString decoding, ISO DateTime parsing and element-wise array
-conversion. A mutating operation is repeated only when the contract declares it
-idempotent *and* the failure was the session dying — never on an error the OPC
-UA server itself returned; see [Staying connected](#staying-connected).
+conversion. A mutating operation is never repeated: when the session dies under it, the
+connection is rebuilt and the call fails with `errors.uncertainOutcome` (its
+`retryPolicy`), and an error the OPC UA server itself returned is never retried;
+see [Staying connected](#staying-connected).
 
 Address-space discovery is breadth-first and bounded by both depth and inspected
 node count, with a visited set for cyclic reference graphs. Its response says
@@ -849,8 +860,11 @@ a complete one. The answer is a sibling of `result` rather than a change to it:
 arguments, not a token: OPC UA continuation points are session state that a
 server holds a limited number of, and exposing them would mean binding them to a
 session, expiring them and refusing stale ones. Arguments need none of that, so
-each continuation point a history read receives is released as soon as it has
-been noticed — which neither runtime did before.
+each continuation point a raw history read receives is released as soon as it has
+been noticed — which neither runtime did before. An aggregate read instead
+follows the server's continuation points within the same call and returns the
+completed range or an explicit error (`aggregateNoProgress`,
+`aggregatePageLimit`), releasing any point still held.
 
 Identity is derived rather than restated: with a client certificate configured,
 both runtimes announce the `subjectAltName` URI of that certificate as the
@@ -869,7 +883,7 @@ there will not be one. Both runtimes advertise `MaxChunkCount` and
 `MaxMessageSize` in the Hello — python-opcua's own defaults are `0`, meaning "no
 limit" — and both enforce them on receipt, because advertising binds only a
 server that chooses to obey: node-opcua does it itself, and the Python runtime
-wraps `SecureConnection._receive`. See [SECURITY.md](../SECURITY.md) for the
+wraps `SecureConnection._receive` and `SecureConnection.receive_from_socket`. See [SECURITY.md](../SECURITY.md) for the
 residual risk, and `transport_limits.py` for why patching a dependency was judged
 the lesser evil.
 

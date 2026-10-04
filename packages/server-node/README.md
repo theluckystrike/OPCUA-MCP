@@ -411,8 +411,8 @@ Result: "Found 15 variables:
   `OPCUA_SECURITY_POLICY` and credentials as shown under
   [Configuration](#configuration) for anything beyond local development
 - The tool profile defaults to **observe-only**. Writes and methods require
-  `OPCUA_PROFILE=operator` _and_ an explicit allowlist, over a channel to a
-  verified server
+  `OPCUA_PROFILE=operator` _and_ an explicit allowlist (or `OPCUA_PROFILE=full`,
+  which needs none), over a channel to a verified server
 - Pin the endpoint with `OPCUA_SERVER_CERT`. Without it the server certificate is
   taken from the endpoint description and not checked against anything, so
   encryption protects against eavesdropping but not against an impostor endpoint
@@ -442,6 +442,8 @@ The server provides detailed error messages for:
 
 - `@modelcontextprotocol/sdk`: MCP SDK for Node.js
 - `node-opcua-client`: OPC UA client library for Node.js (the client half of `node-opcua`; the server half is not needed here and is deliberately not a dependency)
+- `ajv`: JSON Schema (draft 2020-12) validation of tool arguments against the contract
+- `node-opcua-crypto`: reads the configured certificates and private keys (application URI, validity dates)
 
 ## Contributing
 

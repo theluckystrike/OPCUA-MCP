@@ -270,8 +270,8 @@ bounds.
       "parent_node_id": "ns=2;i=1", "data_type": null, "value": null,
       "description": null, "type_definition": "FolderType" },
     { "node_id": "ns=2;i=11", "browse_name": "2:Actuators", … },
-    { "node_id": "ns=2;i=27", "browse_name": "2:Methods", … } ],
-  "truncated": false, "inspected": 4 }
+    { "node_id": "ns=2;i=27", "browse_name": "2:Methods", … }, … ],
+  "truncated": false, "inspected": 5 }
 ```
 > Prompt: *"What folders are under the Industrial Control System?"*
 
@@ -285,9 +285,9 @@ bounds.
       "parent_node_id": "ns=2;i=2", "data_type": "Double", "value": 26.5,
       "description": "Temperature", "type_definition": "BaseDataVariableType" },
     { "node_id": "ns=2;i=90", "browse_name": "2:ScratchAnalog", "node_class": "Variable",
-      "parent_node_id": "ns=2;i=2", "data_type": "Double", "value": 50.0,
-      "description": null, "type_definition": "AnalogItemType" }, … ],
-  "truncated": false, "inspected": 22 }
+      "parent_node_id": "ns=2;i=40", "data_type": "Double", "value": 50,
+      "description": "ScratchAnalog", "type_definition": "AnalogItemType" }, … ],
+  "truncated": false, "inspected": 39 }
 ```
 `type_definition` is what a node *is*, as against what class it belongs to. The
 two variables above are both `Variable` and both Double, and only the second one
@@ -486,7 +486,13 @@ This is the one tool that never fails for being disconnected — it reports it:
   "build_info": null,
   "namespaces": [],
   "diagnostics": null,
-  "error": "connect ECONNREFUSED 127.0.0.1:4840"
+  "error": "connect ECONNREFUSED 127.0.0.1:4840",
+  "capabilities": {
+    "session_generation": null,
+    "checked_at": null,
+    "support": { "history": "unknown", "historyEvents": "unknown", "aggregate": "unknown" },
+    "aggregate_functions": []
+  }
 }
 ```
 
@@ -689,7 +695,7 @@ with it.
 Every id is checked before any is cancelled, so an ID that is not active cancels
 nothing — a typo must not cost the buffers of the subscriptions named beside it:
 ```
-Error: No such subscription: sub-9
+No such subscription: sub-9
 ```
 
 > Subscriptions do not outlive the MCP session. Both servers tear every one of
@@ -729,9 +735,8 @@ background, because MCP has no way for the server to push one at you.
 ```json
 { "node_id": "ns=0;i=2253", "severity_min": 500, "buffer_size": 100 }
 ```
-```
-Subscribed to events from node ns=0;i=2253, buffering up to 100 events of
-severity 500 or above. Read them with read_events.
+```json
+{ "node_id": "ns=0;i=2253", "severity_min": 500, "buffer_size": 100, "replaced": false }
 ```
 Every argument is optional: the default notifier is the Server object
 (`ns=0;i=2253`), where most servers raise everything they have. Subscribing to
@@ -822,7 +827,7 @@ not a short list: a partial answer cannot be told apart from "no alarms".
 Against a server with no Alarms & Conditions support — the bundled mock included
 — this says so rather than returning an empty list:
 ```
-Error: Failed to list active alarms from node ns=0;i=2253: ConditionRefresh
+Failed to list active alarms from node ns=0;i=2253: ConditionRefresh
 failed with status: BadNothingToDo (0x800f0000). The server may not implement
 OPC UA Alarms & Conditions.
 ```
@@ -836,8 +841,8 @@ event is remembered from the call that reported it, so it need not be repeated.
 ```json
 { "event_id": "ZjW7HJrVSFzDV2sMsX7sEQAAAAE=", "comment": "on it — checking the cooler" }
 ```
-```
-Acknowledged alarm ns=1;i=1002 (event ZjW7HJrVSFzDV2sMsX7sEQAAAAE=)
+```json
+{ "event_id": "ZjW7HJrVSFzDV2sMsX7sEQAAAAE=", "condition_id": "ns=1;i=1002", "status": "Good" }
 ```
 Acknowledging tells the server an operator has seen the alarm. It does not clear
 the underlying condition: `active` stays `true` until the plant says otherwise.

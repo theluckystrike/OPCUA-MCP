@@ -25,7 +25,7 @@ operation are gated by the [identity and isolation RFC](docs/rfc/0001-remote-ide
 
 - 🔌 **Any OPC UA server** — PLC, SCADA gateway or historian. Nothing to install on the plant side.
 - 🧰 **The whole operator toolkit** — read, browse, history and aggregates, subscriptions, events and alarms, writes and method calls.
-- 🛡️ **Read-only by default** — writes and method calls need an explicit profile, an allowlist and a pinned server certificate, and every control call is audited.
+- 🛡️ **Read-only by default** — writes and method calls need an explicit profile (with an allowlist under `operator`) and a pinned server certificate, and every control call is audited.
 - 🐍 **Python or Node** — two first-class runtimes with the same tools and the same answers. [Use whichever you have](docs/install.md#which-runtime-am-i-installing).
 - 📦 **One-file Claude Desktop install** — a `.mcpb` bundle with nothing else to set up.
 

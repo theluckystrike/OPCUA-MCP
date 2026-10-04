@@ -26,8 +26,9 @@ the list below grew out of.
   with fully qualified records — a value arrives with its data type, OPC UA
   status, timestamps and, where the node publishes them, its engineering unit
   and range.
-- History and server-side aggregates in one tool, offered when the connected
-  server advertises either capability, and stored events in another.
+- History and server-side aggregates in one tool, and stored events in another.
+  Both are always listed, and refused with `capability_not_supported` before
+  anything is sent when the connected server lacks the capability.
 - Data-change subscriptions with buffered records and optional deadbands, plus
   event collection and the Alarms & Conditions operator workflow: listing,
   acknowledging, confirming, commenting and shelving.
@@ -38,13 +39,14 @@ the list below grew out of.
   key, username or X.509 user identity, and a pinned server certificate, all
   validated at startup.
 - An observe-only default tool profile, with `operator` node and method
-  allowlists, a versioned JSON policy file, and control tools blocked on an
-  unsecured channel unless a lab override is explicit. Authorisation is derived
+  allowlists, a versioned JSON policy file, and control tools blocked unless the
+  channel is secured and the server certificate is pinned (`OPCUA_SERVER_CERT`),
+  or a lab override is explicit. Authorisation is derived
   from a `guard` each control tool declares in the contract, so a tool that
   declares none is denied rather than waved through, and allowlists can be
   pinned by namespace URI rather than by an index the server may renumber.
 - Automatic reconnection with keep-alive and exponential backoff, re-creating
-  data-change subscriptions on the new session, so neither server needs
+  data-change and event subscriptions on the new session, so neither server needs
   restarting when the OPC UA server does.
 - A `get_server_status` tool reporting connection state, endpoint and security,
   the server's own `ServerStatus` and its namespace array — the one tool that
@@ -57,11 +59,11 @@ the list below grew out of.
 ## Next
 
 A critical review of 0.5.1 opened the production-hardening epic
-[#151](https://github.com/IndustriAgents/OPCUA-MCP/issues/151), which is the
-order of work now: an authenticated OPC UA server identity before control is
-offered, an MCP transport that starts whatever the endpoint is doing, bounded and
-machine-readable partial results, audit durability, release signing and
-provenance, and the two runtimes' remaining divergences. The epic lists the
+[#151](https://github.com/IndustriAgents/OPCUA-MCP/issues/151). Its server
+identity before control, MCP transport start-up, bounded and machine-readable
+partial results, audit durability, and release signing and provenance work has
+merged (see `[Unreleased]` in [CHANGELOG.md](CHANGELOG.md)); the two runtimes'
+remaining divergences are the open part. The epic lists the
 issues and the order they depend on each other in.
 
 Two items need no code:
@@ -69,7 +71,7 @@ Two items need no code:
 | # | Work | Done when |
 |---|---|---|
 | 1 | [MCP Registry listing](docs/mcp-registry.md) | The published package already carries `mcpName`; done when the entry resolves in the registry |
-| 2 | Results from third-party OPC UA servers ([#147](https://github.com/IndustriAgents/OPCUA-MCP/issues/147)) | [docs/compatibility.md](docs/compatibility.md) records dated, versioned results for at least two non-mock servers |
+| 2 | Results from third-party OPC UA servers ([#147](https://github.com/IndustriAgents/OPCUA-MCP/issues/147)) | Met for two lab-built servers (open62541 1.5.8, Eclipse Milo 1.1.7) in [docs/compatibility.md](docs/compatibility.md); open for vendor equipment |
 
 The second needs people with real equipment rather than changes to this
 repository, and it is the one input this repository cannot generate for itself.
@@ -140,12 +142,21 @@ This page used to say an audit trail had no plan yet. It ships, and has since
 the policy layer landed — so here is what it does and does not do, which is more
 useful than either claim.
 
-Every `control` and `alarm-action` call writes one JSON line to **stderr**:
+Every `control` and `alarm-action` call writes one JSON line to **stderr**
+(audit `schema_version` 2, wrapped here for reading; it is one line):
 
 ```json
-{"event":"opcua_mcp_policy","timestamp":"2026-09-18T09:12:44.001Z","call_id":"9f2c1ab4de77f031",
- "profile":"operator","tool":"write_opcua_nodes","decision":"allowed","node_ids":["ns=2;i=13"]}
+{"event":"opcua_mcp_policy","schema_version":2,"timestamp":"2026-09-24T09:12:44.001Z",
+ "call_id":"9f2c1ab4de77f031","attempt":1,"endpoint":"opc.tcp://plc:4840",
+ "session":"3b91e0c4a77d2f10","session_generation":1,
+ "operator_label":"line-a-hmi","operator":"line-a-hmi","mcp_principal":null,
+ "process_identity":{"uid":501,"user":"opcua","pid":4242},
+ "opcua_user_identity":{"type":"username","username":"line-a-operator","certificate_sha256":null},
+ "profile":"operator","control":"secured","tool":"write_opcua_nodes","decision":"allowed",
+ "node_ids":["ns=2;i=13"]}
 ```
+
+Every field is described in [SECURITY.md](SECURITY.md#what-is-audited).
 
 `decision` is one of `allowed`, `denied`, `completed` or `failed` — the outcome
 as well as the verdict, because "permitted" and "happened" are different facts
@@ -163,9 +174,11 @@ written values appear, and a test asserts it.
 what a log collector picks up, and it does not survive the process. Set
 `OPCUA_AUDIT_FILE` and both runtimes also append every line to that file; a file
 that cannot be opened stops the server rather than silently auditing to stderr
-alone. Nothing rotates the file. Its durability and the identity it records are
-being hardened under
-[#146](https://github.com/IndustriAgents/OPCUA-MCP/issues/146).
+alone. The server never rotates the file itself; an external rotation is
+detected and the file reopened. Since
+[#146](https://github.com/IndustriAgents/OPCUA-MCP/issues/146) a new file is
+created `0600`, every record is fsync'd by default, and records are schema
+version 2; see [SECURITY.md](SECURITY.md#the-durable-copy-opcua_audit_file).
 
 Per-client approval semantics for control tools are the stated prerequisite for
 [#14](https://github.com/IndustriAgents/OPCUA-MCP/issues/14) and are tracked there.

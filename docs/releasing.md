@@ -7,7 +7,8 @@ package that dies at startup.
 
 ## One-time setup
 
-Neither registry is configured yet; both are needed before the first release.
+Both registries are configured (0.5.1 is published); these steps are what a new
+fork or org move must redo.
 
 1. **npm** — create an automation token and add it as the `NPM_TOKEN` repository
    secret. Publishing uses `--provenance`, which needs `id-token: write` (already
@@ -88,7 +89,7 @@ cd packages/server-node && npm run config:generate && cd ../..
 
 # 3. Verify locally exactly as CI will. The smoke tier builds the .mcpb bundle
 #    and both single-file executables, so it needs the packaging group.
-cd packages/server-node && npm ci && npm run build && npm test && cd ../..
+cd packages/server-node && npm ci && npm run format:check && npm run build && npm test && cd ../..
 uv sync --all-packages --group packaging
 uv run ruff check . && uv run ruff format --check .
 cd tests && OPCUA_TESTS_REQUIRED=1 uv run --no-sync pytest e2e/ unit/ \
@@ -253,10 +254,12 @@ before continuing.
 
 ### Keeping the pins current
 
-Every third-party action is pinned to a commit SHA with the tag in a comment;
-Dependabot's monthly `github-actions` PR moves both, across the three workflows
-and the conformance action. Two versions live in `release.yml` itself and are
-not Dependabot's to update: the AzureSignTool download (version and SHA-256,
+Every third-party action in `ci.yml`, `publish.yml`, `release.yml` and the
+conformance action is pinned to a commit SHA with the tag in a comment
+(`dependency-matrix.yml` and `real-server-conformance.yml` still use version
+tags); Dependabot's monthly `github-actions` PR moves both. Two versions live
+in `release.yml` itself and are not Dependabot's to update: the AzureSignTool
+download (version and SHA-256,
 taken from the release's asset digests) and, implicitly, the cosign release
 `sigstore/cosign-installer` installs by default.
 

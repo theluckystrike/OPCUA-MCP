@@ -71,11 +71,11 @@ is the standard tool for exercising an MCP server by hand.
 
 ```bash
 # Node server
-OPCUA_SERVER_URL=opc.tcp://localhost:4840/freeopcua/server/ \
+OPCUA_SERVER_URL=opc.tcp://localhost:4840/freeopcua/server/ OPCUA_PROFILE=full OPCUA_ALLOW_INSECURE_CONTROL=true \
   npx @modelcontextprotocol/inspector node packages/server-node/build/index.js
 
 # Python server
-OPCUA_SERVER_URL=opc.tcp://localhost:4840/freeopcua/server/ \
+OPCUA_SERVER_URL=opc.tcp://localhost:4840/freeopcua/server/ OPCUA_PROFILE=full OPCUA_ALLOW_INSECURE_CONTROL=true \
   npx @modelcontextprotocol/inspector uv --directory packages/server-python run opcua-mcp-server
 ```
 
@@ -83,28 +83,28 @@ It prints a `http://localhost:6274/?...` URL. In the browser:
 
 1. Click **Connect** (status should turn green).
 2. Open the **Tools** tab → **List Tools**.
-   - Seeing **`read_opcua_history`** confirms the server detected history
-     support on the mock and exposed the tool.
+   - **`read_opcua_history`** is always listed. Against a server without
+     history, a call is refused with `capability_not_supported`.
 3. Select a tool, fill the form, click **Run Tool**, read the result pane.
 
 Things to try:
 
 | Tool | Arguments | Expected |
 |------|-----------|----------|
-| `read_opcua_nodes` | `node_id` = `ns=2;i=3` | `Node ns=2;i=3 value: 26.x` |
-| `browse_opcua_nodes` | *(none)* | `Found 22 variables: …` |
+| `read_opcua_nodes` | `node_ids` = `["ns=2;i=3"]` | one record, `"node_id": "ns=2;i=3"`, `"value": 25.x`, `"status": "Good"` |
+| `browse_opcua_nodes` | *(none)* | one record: `nodes` = the Objects folder's children (`2:IndustrialControlSystem`), `truncated`, `inspected` |
 | `read_opcua_history` | `node_id` = `ns=2;i=3`, `num_values` = `5` | 5 records of `{ value, timestamp, status }`, status `Good`, ISO-8601 UTC timestamps — identical on both servers |
 | `read_opcua_history` | `node_id` = `ns=2;i=3`, `start_time` = `2026-01-01T00:00:00Z` | records within the window |
 | `read_opcua_history` | `node_id` = `ns=2;i=3`, `start_time` = `nope` | clear error: *Use ISO 8601…* |
-| `write_opcua_nodes` | `node_id` = `ns=2;i=13`, `value` = `80` | `Successfully wrote 80…` |
-| `call_opcua_method` | `object_node_id` = `ns=2;i=27`, `method_node_id` = `ns=2;i=28`, `arguments` = `["60"]` | `…Result: true` (SystemMode → AUTO within ~1s) |
-| `subscribe_opcua_nodes` | `node_id` = `ns=2;i=3`, `publishing_interval` = `500` | one record, `change_count` 0 or 1 |
+| `write_opcua_nodes` | `nodes` = `[{"node_id": "ns=2;i=13", "value": 80}]` | one record, `"node_id": "ns=2;i=13"`, `"status": "Good"`, `"error": null` |
+| `call_opcua_method` | `object_node_id` = `ns=2;i=27`, `method_node_id` = `ns=2;i=28`, `arguments` = `["60"]` | `"outputs": [true]`, `"status": "Good"` (SystemMode → AUTO within ~1s) |
+| `subscribe_opcua_nodes` | `node_ids` = `["ns=2;i=3"]`, `publishing_interval` = `500` | one record, `change_count` 0 or 1 |
 | `list_subscriptions` | *(none)* | a few seconds later, the same record with `change_count` climbing and `changes` filling |
-| `unsubscribe_opcua_nodes` | `subscription_id` = `sub-1` | `Unsubscribed sub-1 from node ns=2;i=3 after N value changes` |
-| `subscribe_events` | *(none)* | `Subscribed to events from node ns=0;i=2253…` |
-| `write_opcua_nodes` | `node_id` = `ns=2;i=25`, `value` = `true` | emergency stop — the mock raises an alarm event |
+| `unsubscribe_opcua_nodes` | `subscription_ids` = `["sub-1"]` | the removed record, `"subscription_id": "sub-1"`, with its `change_count` and `changes` |
+| `subscribe_events` | *(none)* | one record, `"node_id": "ns=0;i=2253"`, `"buffer_size": 100`, `"severity_min": 0`, `"replaced": false` |
+| `write_opcua_nodes` | `nodes` = `[{"node_id": "ns=2;i=25", "value": true}]` | emergency stop — the mock raises an alarm event |
 | `read_events` | *(none)* | one record, `message` = `Alarm active: emergency stop`, `severity` 700 |
-| `write_opcua_nodes` | `node_id` = `ns=2;i=26`, `value` = `true` | reset — the next `read_events` shows `Alarm cleared` |
+| `write_opcua_nodes` | `nodes` = `[{"node_id": "ns=2;i=26", "value": true}]` | reset — the next `read_events` shows `Alarm cleared` |
 | `list_active_alarms` | *(none)* | a clear *ConditionRefresh failed…* error: python-opcua has no condition model. Point at the alarms mock below for the working path |
 
 The **Resources** tab lists one resource, `opcua://subscriptions`. Read it while
@@ -115,7 +115,7 @@ a subscription is running and it carries the same records as `list_subscriptions
 
 ```bash
 URL=opc.tcp://localhost:4840/freeopcua/server/
-BIN="npx -y @modelcontextprotocol/inspector --cli node packages/server-node/build/index.js -e OPCUA_SERVER_URL=$URL"
+BIN="npx -y @modelcontextprotocol/inspector --cli node packages/server-node/build/index.js -e OPCUA_SERVER_URL=$URL -e OPCUA_PROFILE=full -e OPCUA_ALLOW_INSECURE_CONTROL=true"
 
 # list tools
 $BIN --method tools/list
@@ -180,15 +180,17 @@ cd packages/mock-server-alarms && npm install && npm start
 # READY endpoint=opc.tcp://localhost:4842/UA/Alarms temperatureNodeId=ns=1;i=1001 …
 ```
 
-Point either MCP server at `opc.tcp://localhost:4842/UA/Alarms`. It starts with
+Point either MCP server at `opc.tcp://localhost:4842/UA/Alarms` (with
+`OPCUA_PROFILE=full OPCUA_ALLOW_INSECURE_CONTROL=true` for the write and
+acknowledge rows). It starts with
 its `HighTemperatureAlarm` already active and unacknowledged:
 
 | Tool | Arguments | Expected |
 |------|-----------|----------|
 | `list_active_alarms` | *(none)* | one record, `condition_name` = `HighTemperatureAlarm`, `acked` = `false` |
-| `acknowledge_alarm` | `event_id` = *(the `event_id` above)*, `comment` = `on it` | `Acknowledged alarm ns=1;i=1002 …`, and `acked` is `true` next time you list |
-| `write_opcua_nodes` | `node_id` = `ns=1;i=1001`, `value` = `20` | below the limit: the alarm goes inactive |
-| `write_opcua_nodes` | `node_id` = `ns=1;i=1001`, `value` = `100` | above it again: a fresh, unacknowledged alarm |
+| `acknowledge_alarm` | `event_id` = *(the `event_id` above)*, `comment` = `on it` | one record, `"condition_id": "ns=1;i=1002"`, `"status": "Good"`, and `acked` is `true` next time you list |
+| `write_opcua_nodes` | `nodes` = `[{"node_id": "ns=1;i=1001", "value": 20}]` | below the limit: the alarm goes inactive |
+| `write_opcua_nodes` | `nodes` = `[{"node_id": "ns=1;i=1001", "value": 100}]` | above it again: a fresh, unacknowledged alarm |
 
 ---
 
@@ -320,8 +322,7 @@ itself, are in [certificates.md](certificates.md).
 | Symptom | Cause / fix |
 |---------|-------------|
 | **List Tools is empty or errors** | Mock server not running → `uv run --no-sync opcua-mock-server` |
-| **`read_opcua_history` not listed** | Connected to a server without history, or wrong `OPCUA_SERVER_URL` |
-| **`read_opcua_history` not listed** | Expected — the bundled mock advertises no aggregate functions, so the tool is correctly hidden |
+| **`read_opcua_history` refused with `capability_not_supported`** | The server keeps no history, or wrong `OPCUA_SERVER_URL`. With `aggregate_function` it is expected against the bundled mock, which offers no aggregates |
 | **`read_events` returns nothing** | Nothing has been raised since the last read. The bundled mock only raises an event when its alarm state *changes* — write `true` to `ns=2;i=25`, then to `ns=2;i=26` |
 | **`list_active_alarms` reports `ConditionRefresh failed`** | The server implements no Alarms & Conditions. Expected against the bundled mock; use `packages/mock-server-alarms` |
 | **`Address already in use` on :4840** | Another mock is on the default port; stop it (`lsof -tiTCP:4840 -sTCP:LISTEN \| xargs kill`) or pass `--endpoint`. The test suite is unaffected — it picks its own port. |
@@ -329,7 +330,7 @@ itself, are in [certificates.md](certificates.md).
 | **Server exits at once with `Configuration error: …`** | A security variable is set to a combination OPC UA cannot honour; the message names the variable to fix |
 | **`BadUserAccessDenied` / `BadIdentityTokenRejected` on every tool** | `OPCUA_USERNAME` / `OPCUA_PASSWORD` rejected by the server |
 | **`BadSecurityChecksFailed`, or the server refuses the session** | The client certificate is not in the OPC UA server's trust list — see [certificates.md](certificates.md) |
-| **`BadCertificateUriInvalid`** | The announced ApplicationUri is not the certificate's `subjectAltName` URI; usually a stale `OPCUA_APPLICATION_URI`, which can simply be unset |
+| **`BadCertificateUriInvalid`** | The announced ApplicationUri is not the certificate's `subjectAltName` URI. A conflicting `OPCUA_APPLICATION_URI` is refused locally before connecting (`OPCUA_APPLICATION_URI=… does not match the subjectAltName URI of OPCUA_CLIENT_CERT`); unset it |
 | **Values "snap back" after a write** | Expected — the mock republishes sensor/actuator state every ~1s; use command variables/methods for lasting changes |
 | **Node value lags after a method call** | The mock propagates method effects via its 1 Hz loop; re-read after ~1s |
 | **Works in the terminal, fails in Claude Desktop** | Desktop apps do not inherit a login shell's `PATH`, so a bare `"command": "npx"` or `"node"` cannot be found. Use absolute paths — `--install claude-desktop` writes them for you |

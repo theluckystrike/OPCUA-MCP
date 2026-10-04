@@ -78,13 +78,11 @@ OPCUA_CLIENT_CERT=/etc/opcua/client.pem
 OPCUA_CLIENT_KEY=/etc/opcua/client_key.pem
 ```
 
-A conflicting `OPCUA_APPLICATION_URI` is refused locally before connecting;
-unset it or set it to the certificate’s own URI.
-
 `OPCUA_APPLICATION_URI` is not needed: both runtimes take the URI out of
 `OPCUA_CLIENT_CERT`. Set it only for a certificate with no URI in its
-`subjectAltName`, and expect a warning if it contradicts one that has it — the
-certificate is what the server checks against.
+`subjectAltName`. One that contradicts the certificate's URI is refused locally
+before connecting, because the certificate is what the server checks against:
+unset it or set it to the certificate’s own URI.
 
 Absolute paths. The MCP server is started by a desktop client, in whatever
 working directory that client happens to have.

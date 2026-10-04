@@ -45,8 +45,8 @@ reported on `main`.
 - **Covered** — an automated test asserts the behaviour on both runtimes.
 - **Not modelled** — the fixture does not implement that OPC UA capability, so
   nothing could be tested against it. Two of these are themselves assertions:
-  the plant mock is what proves the aggregate tool is *hidden* when unsupported,
-  and that `list_active_alarms` says so plainly against a server with no
+  the plant mock is what proves `read_opcua_history` refuses `aggregate_function`
+  with `capability_not_supported` when the server offers no aggregates, and that `list_active_alarms` says so plainly against a server with no
   condition model.
 - **Not exercised** — the capability may exist, but no test uses it there.
 
@@ -142,12 +142,12 @@ Results: [`milo-example-2026-09-24.json`](../compatibility/results/milo-example-
 
 <!-- conformance-matrix:end -->
 
-Also seen against open62541, and not counted as a failure: both runtimes ask
-for history *bounds*. A raw read whose window opens before the first stored
-value starts with a `BadBoundNotFound` placeholder record, and a read that
-follows `completeness.continuation` starts with the value just before its
-`start_time` ([#172](https://github.com/IndustriAgents/OPCUA-MCP/issues/172)).
-`history.raw` counts the placeholders in its evidence.
+Neither runtime asks for history *bounds* (ReturnBounds=false,
+`history.rawReturnBounds` in `contract/tools.json`) since
+[#172](https://github.com/IndustriAgents/OPCUA-MCP/issues/172). `history.raw` and
+`history.continuation` fail if a `BadBoundNotFound`/`BadBoundNotSupported`
+placeholder, or a reading before the requested `start_time`, comes back. The
+dated results above predate that change.
 
 #### What the levels mean
 
@@ -368,13 +368,6 @@ being fixed in both runtimes:
   parameters, event subscriptions after a reconnect, policy-file validation,
   the startup check order, auditing of refused control calls and signal
   handling. Still open: result and error formatting and `--install` details.
-- [#136](https://github.com/IndustriAgents/OPCUA-MCP/issues/136) — with
-  `OPCUA_RECONNECT_MAX_RETRY=-1` and an unreachable endpoint, the Node server may
-  never open its MCP transport, and the numeric reconnect settings accept
-  different spellings on each runtime.
-
-Until #136 is fixed, do not rely on `OPCUA_RECONNECT_MAX_RETRY=-1` with the
-Node runtime.
 
 ## Security coverage
 

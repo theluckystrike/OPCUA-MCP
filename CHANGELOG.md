@@ -34,10 +34,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   error causes. Tool wrappers retain the cause, and both runtimes bound cyclic
   cause traversal. Reads retry once; control calls report an uncertain outcome
   and are never resent. Empty Node error messages report the error name.
+
 ### Fixed — finish server-paged aggregate history (#137)
 - Both runtimes consume native continuation points with the original query,
   preserving interval boundaries. A stalled or oversized aggregate fails
   explicitly instead of returning an unfinished range; held points are released.
+
 ### Changed — standard schemas and generated runtime types (#138)
 - Declare JSON Schema draft 2020-12 for tool inputs and results; validate the
   metadata and reject unsupported schema keywords in CI. Generate both runtimes’
@@ -45,6 +47,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Replace custom input validators with Ajv and jsonschema, translating failures
   into stable project codes and messages. Optional null defaults are now explicit
   in the advertised schemas. Result parity checks use the standard validator.
+- New runtime dependencies, each with a floor and a ceiling: `ajv` `^8.20.0`
+  (npm), `jsonschema>=4.23,<5` and `typing-extensions>=4.12,<5` (PyPI).
 
 ### Security — enforce all Python receive bounds (#175)
 - Reject chunks over `maxChunkSize` before reading their bodies and reject
@@ -67,6 +71,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   field names and values, including nested structures and arrays, on both runtimes.
   LocalizedText fields retain Locale and Text. Opaque or unsupported structures
   carry `{"$opcua":"undecodableExtensionObject"}` instead of a library debug string.
+
 ### Added — per-release first-class runtime evidence (#143)
 - Publish a compatibility report with exact tested versions, source/input digests,
   group counts and declared differences. Release/publish gates exercise every
@@ -254,7 +259,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   orphan. It now shuts down (subscriptions, then session, bounded at 5 s) and
   exits when stdin closes. Found by the new binary smoke test; the Python
   runtime already exited.
-- `uv.lock` recorded the workspace packages at 0.5.0 after the 0.5.1 release.
 - **The Node server never started against an unreachable endpoint with
   `OPCUA_RECONNECT_MAX_RETRY=-1` (#136).** It awaited its first OPC UA
   connection before opening the MCP stdio transport, and handed `-1` to
@@ -299,8 +303,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   disconnects the client that is still dialling, and Python's backoff waits on
   an event its new `close()` sets rather than in `time.sleep`, so a server asked
   to stop no longer dials a plant that is down for the rest of the backoff.
-- Node now passes `endpointMustExist` rather than the deprecated
-  `endpoint_must_exist`, which logged a warning on every connect.
 - **History continuation points are released.** A read the OPC UA server cut
   short returned a continuation point that neither runtime looked at or gave
   back, so the server held it until the session closed — and a server holds only
@@ -348,7 +350,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   | PyPI | `httpx` | `>=0.28.1` | removed |
   | npm | `@modelcontextprotocol/sdk` | `^1.0.4` | `^1.26.0` |
   | npm | `node-opcua-client` | `^2.184.8` | unchanged |
-  | npm | `node-opcua-crypto` | `^6.0.0` | unchanged |
+  | npm | `node-opcua-crypto` | `^5.11.0` | `^6.0.0` (#153) |
 
   `httpx` was declared but never imported — the MCP SDK moved to `httpx2` — so
   it is dropped rather than bounded, and takes `httpcore` and `certifi` out of
@@ -388,7 +390,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   naming `MaxNodesPerWrite`, and a paged history read reports itself
   incomplete with a continuation that reaches every value. History bounding
   values are tracked in
-  [#172](https://github.com/IndustriAgents/OPCUA-MCP/issues/172). A manual **Real-server conformance**
+  [#172](https://github.com/IndustriAgents/OPCUA-MCP/issues/172). Both are fixed in
+  this release (#171, #172 above); the published results predate the fixes. A
+  manual **Real-server conformance**
   workflow builds both servers in CI and runs the harness there; it is not a
   required check.
 - **The identity status is reported everywhere control is decided.**
@@ -416,7 +420,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   generated from it by `npm run config:generate` (`packages/server-node/scripts/
   config-artifacts.mjs`); CI runs `npm run config:check`, and
   `tests/unit/test_config_schema.py` fails if either runtime reads a variable the
-  schema omits or the reverse, if a README's configuration table misses one, or
+  schema omits or the reverse, if a document names a variable no server reads, or
   if a parser disagrees with a declared choice, minimum or blank default — the
   same cases drive the Node parsers in `test/config-schema.test.mjs`. The schema
   ships in both packages (`build/config.json`; `opcua_mcp_server/config.json`,
@@ -456,12 +460,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the suite.
 - **The tool and configuration reference, and every copy of the version, are
   generated** (#149). The same `npm run config:generate` now rewrites, between
-  `<!-- BEGIN/END GENERATED -->` markers, the tool table in the README, both
-  package READMEs and `docs/examples.md` (count, access class, MCP annotations,
-  capability gates and each tool's one-line summary, from `contract/tools.json`;
-  the `docs/examples.md` index links each tool to its section), and the
-  configuration tables in the three READMEs (from `contract/config.json`, grouped
-  by category, each package README narrowed to what its runtime reads). The
+  `<!-- BEGIN/END GENERATED -->` markers, the tool table in `docs/tools.md` and
+  both package READMEs, a tool summary in the README, and the `docs/examples.md`
+  index (count, access class, MCP annotations, capability gates and each tool's
+  one-line summary, from `contract/tools.json`; the `docs/examples.md` index
+  links each tool to its section), and the configuration tables in
+  `docs/configuration.md` and both package READMEs (from `contract/config.json`,
+  grouped by category, each package README narrowed to what its runtime reads). The
   version has one source, `packages/server-node/package.json`: the generator
   stamps it into `mcpb/manifest.json`, both `version` fields of `server.json`,
   both `pyproject.toml`s, `package-lock.json`, `uv.lock` and the roadmap.
@@ -516,6 +521,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   are printed as `Error [code]: …`, with exit code 1 for a refusal and 2 for a
   usage error, as before.
 
+### Added (#150)
 - **A dependency support policy**, [docs/dependency-policy.md](docs/dependency-policy.md)
   (#150): the supported Python and Node versions, the declared range of every
   direct runtime dependency of both packages, the rules those ranges follow,
@@ -529,7 +535,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **A weekly dependency matrix**, `.github/workflows/dependency-matrix.yml`: the
   full suite, both runtimes, against the *lowest* supported set (every direct
   dependency at its floor — uv's `--resolution lowest-direct`, and
-  `scripts/pin-dependency-floors.mjs` for npm — on Python 3.10 and exactly Node
+  `packages/server-node/scripts/pin-dependency-floors.mjs` for npm — on Python 3.10 and exactly Node
   22.13.0) and the *latest* compatible set (no lockfile, on Python 3.13 and Node
   24). It also runs on any PR that touches a manifest or lockfile. It is not a
   required check. Running the lowest set before merging this showed the
@@ -593,68 +599,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   [docs/install.md](docs/install.md#reproducibility).
 
 ### Documentation
-- **Both runtimes are first-class, and that is now a written promise rather
-  than a habit** ([ADR 0001](docs/adr/0001-two-first-class-runtimes.md), #143).
-  The Python and Node packages meet the same conformance suite, security
-  baseline, artifact checks and release gate, and ship together at one version;
-  a divergence between them blocks the release of *both*, not only the runtime
-  at fault. The ADR records why this model won over a primary-plus-compatibility
-  tier and over retiring one runtime, what exactly is guaranteed to match (names,
-  schemas, behaviour, errors, configuration, security, bounds, release timing)
-  and what is not (speed, log wording, a client library's own error reason), the
-  runtime floors and end-of-life policy, the tests required before either
-  package ships, how a divergence is reported, and how the model itself would
-  be changed. It also settles the shared strategy for #138, #141 and #144. The
-  first ADR, so `docs/adr/` gains an index and a template.
-- **What the two runtimes do not share by design is declared, in one
-  machine-readable place.** `contract/runtime-differences.json` lists thirteen
-  deliberate differences — among them the two Node-only AES security policies,
-  the Python runtime's extension-based PEM/DER rule, the MCP protocol generation
-  each SDK speaks, the Node-only `.mcpb` bundle and registry listing, how each
-  repairs a dropped connection, and node-opcua's on-disk PKI folder — each with
-  the rationale that makes it allowed. Accidental divergences are deliberately
-  *not* in that file: the ones known today are bugs, tracked in #157 (about
-  thirty, found while writing the ADR — the most serious can make the two
-  runtimes write a different value or read a different time window for the same
-  call) and #136, and `docs/compatibility.md` now lists them with the input
-  habits that avoid them until they are fixed.
-  `tests/unit/test_runtime_differences.py` checks the file's shape and every
-  claim the repository can answer for itself — the policy lists, the runtime
-  floors in the manifests and the ADR, the SDK majors, the bundle, the registry
-  file, the installed commands, and the runtime-specific settings
-  `contract/config.json` records (today the AES entries of `runtimeChoices`) —
-  and that
-  [docs/compatibility.md](docs/compatibility.md#runtime-differences) lists
-  every entry.
-- **The docs no longer promise more interchangeability than CI enforces, or
-  less.** "Interchangeable, nothing depends on the choice" is now "first-class,
-  apart from the declared differences" in the README, `docs/install.md`,
-  `docs/architecture.md` and both package READMEs. The Python README no longer
-  implies the `.mcpb` bundle is Python. `docs/install.md` stops recommending the
-  Python executable unconditionally when SECURITY.md recommends Node for
-  untrusted networks. SECURITY.md's supported versions named only the npm
-  release; security fixes ship in both. And `docs/compatibility.md` and
-  `docs/certificates.md` still said the server certificate could not be pinned —
-  `OPCUA_SERVER_CERT` pins it, and the end-to-end suite checks that on both
-  runtimes. The README's overview also said thirteen tools; there are fifteen.
-- **A runtime divergence has somewhere to go.** The bug template gains a *both
-  runtimes, behaving differently* option, and CONTRIBUTING states the rule: a
-  behaviour change lands in both runtimes in the same PR, or is declared.
-
-## [0.5.1] — 2026-09-22
-
-0.5.0 was tagged but reached neither npm nor PyPI. Both registry jobs failed, for
-the same underlying reason: the repository moved to the IndustriAgents
-organisation on 2026-09-20, and while #125 updated the links in the prose, it
-touched no package manifest and no publishing account. 0.4.1 had shipped two days
-before the move, so 0.5.0 was the first release that could discover this.
-
-This release is 0.5.0 plus the fix, so **0.5.1 is the first published release of
-the 0.5 line** and the 0.5.0 notes below describe what is in it. Tags in this
-repository are immutable by ruleset, which is why this is a new version rather
-than a re-tag.
-
-### Documentation
 - **Release notes link the conformance matrix at their tag** (#147).
   [docs/releasing.md](docs/releasing.md#the-conformance-matrix-in-the-release-notes)
   says how, and when a release may be called production-qualified for a server:
@@ -673,7 +617,7 @@ than a re-tag.
   be changed. It also settles the shared strategy for #138, #141 and #144. The
   first ADR, so `docs/adr/` gains an index and a template.
 - **What the two runtimes do not share by design is declared, in one
-  machine-readable place.** `contract/runtime-differences.json` lists thirteen
+  machine-readable place.** `contract/runtime-differences.json` lists sixteen
   deliberate differences — among them the two Node-only AES security policies,
   the Python runtime's extension-based PEM/DER rule, the MCP protocol generation
   each SDK speaks, the Node-only `.mcpb` bundle and registry listing, how each
@@ -706,6 +650,18 @@ than a re-tag.
 - **A runtime divergence has somewhere to go.** The bug template gains a *both
   runtimes, behaving differently* option, and CONTRIBUTING states the rule: a
   behaviour change lands in both runtimes in the same PR, or is declared.
+- **The README is setup per agent; the reference moved into `docs/`** (#176).
+  Copy-paste setup for Claude Desktop, Claude Code, Codex, Gemini CLI,
+  Antigravity, Cursor, VS Code, Windsurf and any other client, plus the mock, a
+  production checklist and a documentation index. Tools, result shapes, limits
+  and completeness are in `docs/tools.md`; every setting is in
+  `docs/configuration.md`. Both keep their generated blocks, and the README
+  gains a generated tool summary.
+- **RFC 0001, identity and isolation before a remote gateway, is accepted**
+  ([docs/rfc/0001-remote-identity-isolation.md](docs/rfc/0001-remote-identity-isolation.md),
+  #148, #196). The product stays one local stdio process per MCP client; a
+  remote or shared gateway waits on the gates #14, #15 and #88. The README,
+  ROADMAP, `docs/architecture.md` and `docs/install.md` link it.
 - **The single-runtime bugs among the undeclared Node/Python divergences
   (#157).** Each one is now the same on both runtimes and pinned by a test on
   both — a shared fixture table where it is a rule, an end-to-end test where it

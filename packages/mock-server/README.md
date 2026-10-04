@@ -140,18 +140,17 @@ client = Client("opc.tcp://localhost:4840/freeopcua/server/")
 client.connect()
 
 # Read temperature sensor
-temp_node = client.get_node("ns=2;s=IndustrialControlSystem.Sensors.Temperature")
+temp_node = client.get_node("ns=2;i=3")
 temperature = temp_node.get_value()
 print(f"Temperature: {temperature}°C")
 
 # Control pump
-pump_node = client.get_node("ns=2;s=IndustrialControlSystem.Actuators.PumpEnabled")
+pump_node = client.get_node("ns=2;i=12")
 pump_node.set_value(True)
 
 # Call start production method
-methods_node = client.get_node("ns=2;s=IndustrialControlSystem.Methods")
-start_method = methods_node.get_child("StartProduction")
-result = start_method.call_method(50.0)  # Start with 50 units/hour
+methods_node = client.get_node("ns=2;i=27")
+result = methods_node.call_method("2:StartProduction", 50.0)  # Start with 50 units/hour
 
 client.disconnect()
 ```
@@ -201,13 +200,23 @@ IndustrialControlSystem/
 │   ├── SystemMode
 │   ├── EmergencyStop
 │   ├── ProductionRate
-│   └── TotalProduction
-└── Methods/
-    ├── StartProduction
-    ├── StopProduction
-    ├── EmergencyStop
-    ├── ResetSystem
-    └── CalibrateSensors
+│   ├── TotalProduction
+│   ├── StartProductionCommand
+│   ├── StopProductionCommand
+│   ├── EmergencyStopCommand
+│   └── ResetSystemCommand
+├── Methods/
+│   ├── StartProduction
+│   ├── StopProduction
+│   ├── EmergencyStop
+│   ├── ResetSystem
+│   ├── CalibrateSensors
+│   └── EchoDuration
+└── Scratch/
+    ├── ScratchDouble
+    ├── ScratchBoolean
+    ├── ScratchAnalog
+    └── OverriddenSetpoint
 ```
 
 ## Security
@@ -256,7 +265,7 @@ To add new sensors or actuators:
 ```
 OSError: [Errno 48] Address already in use
 ```
-Solution: Kill existing server process or change port in code
+Solution: Kill existing server process or pass `--endpoint` with another port
 
 **Connection Refused**
 - Check if server is running

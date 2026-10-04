@@ -61,7 +61,8 @@ Only link to the listing once that returns it.
   and both carry defaults: the mock's endpoint and `observe`. No endpoint of
   anyone's is embedded, and no credential is.
 - **`OPCUA_PASSWORD` is marked `isSecret`**, as are the paths to the two private
-  keys (`OPCUA_CLIENT_KEY`, `OPCUA_USER_KEY`), so a client that honours the flag
+  keys (`OPCUA_CLIENT_KEY`, `OPCUA_USER_KEY`) and to the audit HMAC key
+  (`OPCUA_AUDIT_CHAIN_KEY_FILE`), so a client that honours the flag
   will not store or display them in the clear.
 - **Every variable either runtime reads is listed** — including server
   certificate pinning, X.509 user authentication, value-range overrides and the

@@ -56,22 +56,22 @@ Every test runs against **both** server implementations.
 
 | Test | What it verifies |
 |------|------------------|
-| `test_lists_core_tools` | All 12 always-on tools are advertised |
-| `test_history_tool_exposed_when_supported` | History tool appears because the mock enables history |
+| `test_lists_core_tools` | The 12 core tools in `CORE_TOOLS` are advertised |
+| `test_history_tool_exposed_when_supported` | `read_opcua_history` is advertised by both runtimes |
 | `test_the_aggregate_argument_is_offered_even_where_unsupported` | `aggregate_function` is listed against a mock with no aggregates — the catalogue does not depend on the server (#140) |
 | `test_an_aggregate_call_against_a_server_without_them_errors_cleanly` | …and calling it is refused with `capability_not_supported` and a remediation |
 | `test_aggregate_tool_exposed_when_supported` | Against the aggregate-capable mock, `get_server_status` reports the functions it offers |
 | `test_aggregate_average_values_are_correct` | `Average` over a known ramp advances by exactly one interval per bucket |
 | `test_aggregate_default_end_time_is_utc` | Omitting `end_time` does not overshoot the window on a non-UTC host (#24) |
 | `test_aggregate_rejects_unknown_function` | An unsupported aggregate name is rejected, listing what the server offers |
-| `test_read_single_node` | `read_opcua_node` returns a value |
-| `test_read_multiple_nodes` | `read_multiple_opcua_nodes` returns all requested nodes |
-| `test_get_all_variables` | `get_all_variables` discovers the address space |
-| `test_browse_children` | `browse_opcua_node_children` lists the four folders |
+| `test_read_single_node` | `read_opcua_nodes` with one node id returns a value |
+| `test_read_multiple_nodes` | `read_opcua_nodes` returns all requested nodes |
+| `test_browse_discovers_variables_below_a_root` | `browse_opcua_nodes` with `depth` and `node_class: "Variable"` discovers the address space |
+| `test_browse_children` | `browse_opcua_nodes` lists the four folders |
 | `test_write_numeric_node` | Writing a `Double` actuator succeeds |
 | `test_write_boolean_node` | Writing a `Boolean` node with `"true"` succeeds (bool-handling regression) |
 | `test_call_method_start_then_stop` | `call_opcua_method` drives `StartProduction`/`StopProduction` and `SystemMode` reacts |
-| `test_read_history` | The history tool (`read_history_opcua_node`) returns timestamped records |
+| `test_read_history` | The history tool (`read_opcua_history`) returns timestamped records |
 | `test_event_tools_are_always_advertised` | The four event tools are not capability-gated |
 | `test_subscribe_then_read_receives_an_event` | `subscribe_events` + `read_events` deliver an event the mock raised, in the canonical record shape |
 | `test_reading_twice_drains_the_buffer` | An event is handed over once, never twice |
@@ -104,8 +104,9 @@ Every test runs against **both** server implementations.
 | `test_a_bad_retry_setting_is_rejected_at_startup` | An unparseable `OPCUA_RECONNECT_*` value stops both runtimes rather than silently defaulting |
 | `test_an_unsecured_session_reports_no_unexpected_deprecation` / `test_an_x509_user_session_reports_no_unexpected_deprecation` | Neither server prints a deprecation that is not on `fixtures/deprecation-allowlist.json` while connecting, reading, browsing, writing, or authenticating with an X.509 user certificate (#150) |
 
-Both servers expose the history tool under the same name, `read_history_opcua_node`,
-and only when the server advertises `AccessHistoryDataCapability`.
+Both servers expose the history tool under the same name, `read_opcua_history`,
+whatever the server advertises; a call the server cannot serve is refused with
+`capability_not_supported`.
 
 ## Mock servers
 
@@ -208,7 +209,7 @@ uv run --no-sync pytest -v -k "[node]"
 ```
 
 The brackets matter: they match the parametrisation id. A plain `-k node` would
-also match test *names* like `test_read_opcua_node`.
+also match test *names* like `test_read_single_node`.
 
 ## Real-server conformance (opt-in)
 
